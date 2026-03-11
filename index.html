@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时代之变 · 映像中国</title>
+    <!-- Leaflet 样式与脚本 (轻量级地图库) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- 字体与基础样式 -->
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+        }
+        body {
+            background: #f0f2f5;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 1400px;
+            width: 100%;
+            background: white;
+            border-radius: 32px;
+            box-shadow: 0 20px 40px rgba(0, 20, 30, 0.2);
+            overflow: hidden;
+            border: 1px solid rgba(200, 200, 210, 0.3);
+        }
+        /* 主题头部 */
+        .header {
+            background: linear-gradient(135deg, #0b2842 0%, #1b4f6e 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .header h1 {
+            font-weight: 400;
+            font-size: 2.2rem;
+            letter-spacing: 4px;
+            text-shadow: 2px 2px 4px #00000030;
+        }
+        .header h1 strong {
+            font-weight: 700;
+            color: #ffd966;
+        }
+        .header p {
+            font-style: italic;
+            opacity: 0.9;
+            margin-top: 6px;
+            font-size: 1rem;
+        }
+        .stats {
+            background: #ffffff20;
+            backdrop-filter: blur(8px);
+            padding: 12px 24px;
+            border-radius: 60px;
+            font-size: 1.1rem;
+            border: 1px solid #ffffff40;
+        }
+        /* 地图主区域 */
+        .map-wrapper {
+            position: relative;
+            width: 100%;
+            height: 550px;
+            border-bottom: 3px solid #cfddee;
+        }
+        #chinaMap {
+            height: 100%;
+            width: 100%;
+            background: #d6e9f5;
+        }
+        /* 加载状态提示 */
+        .map-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 24px 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            z-index: 1000;
+        }
+        .map-loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e0e7f0;
+            border-top-color: #ff9933;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .map-loading .loading-text {
+            color: #1d3b5c;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .map-loading .retry-btn {
+            background: #1d4e6f;
+            color: white;
+            border: none;
+            padding: 8px 24px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+        .map-loading .retry-btn:hover {
+            background: #ff9933;
+        }
+        .map-loading.error {
+            border: 2px solid #ff4444;
+        }
+        .map-loading.error .loading-text {
+            color: #cc0000;
+        }
+        /* 时间轴样式 */
+        .timeline-section {
+            background: linear-gradient(135deg, #f8faff 0%, #eef3fa 100%);
+            padding: 24px 32px;
+            border-bottom: 2px solid #d0ddea;
+        }
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            font-weight: 600;
+            color: #1d3b5c;
+        }
+        .timeline-header span:last-child {
+            background: #1d4e6f;
+            color: white;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        .timeline-container {
+            position: relative;
+            height: 60px;
+            display: flex;
+            align-items: center;
+        }
+        .timeline-container input[type="range"] {
+            position: absolute;
+            width: 100%;
+            pointer-events: none;
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        .timeline-container input[type="range"]::-webkit-slider-thumb {
+            pointer-events: all;
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #ff9933;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .timeline-container input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .timeline-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #5e6f8d;
+        }
+        /* 控制面板 */
+        .control-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            padding: 30px 32px;
+            background: #ffffff;
+        }
+        .upload-card {
+            flex: 2;
+            min-width: 360px;
+            background: #f8faff;
+            border-radius: 28px;
+            padding: 26px 28px;
+            box-shadow: inset 0 2px 8px #e0e7f0, 0 8px 18px #d0d9e8;
+            border: 1px solid #dbe4f0;
+        }
+        .upload-card h2 {
+            font-size: 1.8rem;
+            font-weight: 400;
+            color: #1d3b5c;
+            margin-bottom: 20px;
+            border-left: 6px solid #ff9933;
+            padding-left: 18px;
+        }
+        .upload-card h2 small {
+            font-size: 1rem;
+            color: #5e6f8d;
+            margin-left: 12px;
+        }
+        .form-row {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .form-row label {
+            font-weight: 600;
+            color: #1f3a57;
+            margin-bottom: 6px;
+            font-size: 0.95rem;
+            letter-spacing: 0.3px;
+        }
+        .form-row input, .form-row select, .form-row button {
+            padding: 14px 18px;
+            border-radius: 40px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            font-size: 1rem;
+            transition: all 0.2s;
+            outline: none;
+        }
+        .form-row input:focus, .form-row select:focus {
+            border-color: #ff9933;
+            box-shadow: 0 0 0 3px #ffd96680;
+        }
+        .form-row button {
+            background: linear-gradient(145deg, #1d4e6f, #0f3b55);
+            color: white;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 8px 12px #102a3c50;
+            letter-spacing: 0.8px;
+            transition: 0.15s;
+        }
+        .form-row button:hover {
+            background: #ff9933;
+            transform: translateY(-3px);
+            box-shadow: 0 15px 20px #b0661e50;
+        }
+        .form-row button:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .file-hint {
+            font-size: 0.8rem;
+            color: #7b8ba3;
+            margin-top: 5px;
+        }
+        .photo-gallery-side {
+            flex: 3;
+            min-width: 300px;
+            background: #ffffff;
+            border-radius: 28px;
+            padding: 22px 22px;
+            box-shadow: 0 6px 18px #bac8dc;
+            border: 1px solid #d0ddea;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .gallery-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 16px;
+            font-weight: 500;
+            color: #254b6d;
+        }
+        .gallery-title span {
+            background: #eaf0fa;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            color: #1a3f5c;
+        }
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 16px;
+        }
+        .photo-item {
+            position: relative;
+            background: #f5f9ff;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 5px 12px #cdd9ec;
+            transition: transform 0.2s;
+            border: 1px solid white;
+        }
+        .photo-item:hover {
+            transform: scale(1.02);
+            border-color: #ffaa44;
+        }
+        .photo-actions {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .photo-item:hover .photo-actions {
+            opacity: 1;
+        }
+        .delete-btn {
+            background: rgba(255, 80, 80, 0.9);
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        }
+        .delete-btn:hover {
+            background: #ff4444;
+            transform: scale(1.1);
+        }
+        .photo-thumb {
+            width: 100%;
+            height: 110px;
+            object-fit: cover;
+            background: #b6c9e0;
+            display: block;
+        }
+        .photo-info {
+            padding: 10px 10px 12px;
+            font-size: 0.85rem;
+            color: #11212e;
+        }
+        .photo-info .loc {
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .photo-info .year {
+            color: #ff6b1a;
+            font-weight: 600;
+        }
+        .empty-gallery {
+            color: #8f9fb1;
+            font-style: italic;
+            padding: 20px;
+            text-align: center;
+        }
+        .reset-btn {
+            background: white;
+            border: 2px solid #1d4e6f;
+            color: #1d4e6f;
+            border-radius: 40px;
+            padding: 12px 28px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-left: 20px;
+        }
+        .reset-btn:hover {
+            background: #1d4e6f;
+            color: white;
+        }
+        footer {
+            padding: 20px 32px;
+            background: #eef3fa;
+            color: #475e7c;
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .suggestion-tag {
+            background: #ffeed9;
+            border-radius: 50px;
+            padding: 8px 24px;
+            color: #b25600;
+            font-weight: 500;
+        }
+        /* 地图弹窗样式 */
+        .custom-popup-img {
+            max-width: 200px;
+            max-height: 150px;
+            border-radius: 16px;
+            box-shadow: 0 6px 12px #00000050;
+            margin-bottom: 5px;
+        }
+        .leaflet-popup-content {
+            min-width: 220px;
+            text-align: center;
+        }
+        /* 评论区域样式 */
+        .comment-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e0e7f0;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .comment-item {
+            background: #f0f5fa;
+            border-radius: 12px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+        .comment-item .author {
+            font-weight: 600;
+            color: #1d4e6f;
+        }
+        .comment-item .time {
+            font-size: 0.75rem;
+            color: #8f9fb1;
+            margin-left: 8px;
+        }
+        .comment-input-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .comment-input-row input {
+            flex: 1;
+            padding: 8px 14px;
+            border-radius: 20px;
+            border: 1px solid #cbd5e1;
+            font-size: 0.85rem;
+        }
+        .comment-input-row button {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: none;
+            background: #1d4e6f;
+            color: white;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .comment-input-row button:hover {
+            background: #ff9933;
+        }
+        .popup-delete-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 6px 16px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            width: 100%;
+        }
+        .popup-delete-btn:hover {
+            background: #cc0000;
+        }
+        #adminLoginBtn:hover {
+            background: #ff9933;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- 头部：时代之变 -->
+    <div class="header">
+        <div>
+            <h1>🌏 <strong>时代之变</strong> · 映像中国</h1>
+            <p>每一张照片，都是岁月留下的印记。上传你的故事，点亮家乡的变迁。</p>
+        </div>
+        <div class="stats" id="statsDisplay">📸 已收录 <span id="photoCount">0</span> 张时光影像</div>
+    </div>
+
+    <!-- 地图主体 -->
+    <div class="map-wrapper">
+        <div id="chinaMap"></div>
+        <!-- 加载状态提示 -->
+        <div id="mapLoading" class="map-loading">
+            <div class="spinner"></div>
+            <div class="loading-text">正在加载地图数据...</div>
+            <button class="retry-btn" id="retryLoadBtn" style="display:none;">🔄 重试加载</button>
+        </div>
+    </div>
+
+    <!-- 时间轴区域 -->
+    <div class="timeline-section">
+        <div class="timeline-header">
+            <span>📅 时间筛选</span>
+            <span id="timelineRange">1900 - 2026</span>
+        </div>
+        <div class="timeline-container">
+            <input type="range" id="timelineStart" min="1900" max="2026" value="1900" />
+            <input type="range" id="timelineEnd" min="1900" max="2026" value="2026" />
+        </div>
+        <div class="timeline-labels">
+            <span id="startYearLabel">1900</span>
+            <span id="endYearLabel">2026</span>
+        </div>
+    </div>
+
+    <!-- 控制区域：上传 + 当前省份照片墙 -->
+    <div class="control-panel">
+        <!-- 上传卡片 -->
+        <div class="upload-card">
+            <h2>📤 上传时代印记 <small>省份·年份·记忆</small></h2>
+            <div class="form-row">
+                <label>📍 拍摄地点</label>
+                <select id="provinceSelect" required disabled>
+                    <option value="" disabled selected>— 等待地图加载 —</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>🏞️ 拍摄位置 (如：XX 村/老街)</label>
+                <input type="text" id="locationInput" placeholder="例：嘉兴南湖 / 大寨田" disabled />
+            </div>
+            <div class="form-row">
+                <label>📅 拍摄年份</label>
+                <input type="number" id="yearInput" placeholder="例如 1998" min="1900" max="2026" disabled />
+            </div>
+            <div class="form-row">
+                <label>🖼️ 上传照片</label>
+                <input type="file" id="photoInput" accept="image/*" disabled />
+                <div class="file-hint">支持 jpg/png，将保存在当前浏览器中（仅演示用）</div>
+            </div>
+            <div class="form-row">
+                <button id="uploadBtn" disabled>⬆️ 上传 · 点亮地图</button>
+            </div>
+            <div style="font-size:0.85rem; color:#2f5575; text-align:center; margin-top:16px">
+                ⚡ 点击任意地点可放大查看该区域照片
+            </div>
+        </div>
+        <!-- 照片侧边栏 -->
+        <div class="photo-gallery-side" id="gallerySide">
+            <div class="gallery-title">
+                <span id="currentProvinceDisplay">🖼️ 点击地点查看照片</span>
+                <span id="photoCountInProvince">0 张</span>
+            </div>
+            <div id="provincePhotoList" class="photo-grid">
+                <div class="empty-gallery">✨ 暂未上传照片，或点击地点查看</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部 -->
+    <footer>
+        <div>© 时代之变 · 公共记忆项目</div>
+        <div class="suggestion-tag">💡 功能：时间轴筛选 / 照片评论 / 权限删除</div>
+        <div style="display:flex;gap:12px;">
+            <button class="reset-btn" id="resetViewBtn">🗺️ 返回全国视图</button>
+            <button class="reset-btn" id="adminLoginBtn" style="border-color:#ff9933;color:#ff9933;">🔐 管理员登录</button>
+        </div>
+    </footer>
+</div>
+
+<script>
+(function() {
+    // ---------- 权限管理系统 ----------
+    let currentUser = {
+        id: localStorage.getItem('userId') || 'user_' + Date.now() + Math.random(),
+        isAdmin: false
+    };
+    localStorage.setItem('userId', currentUser.id);
+
+    const ADMIN_PASSWORD = 'admin123';
+
+    function canDeletePhoto(photo) {
+        return photo.uploaderId === currentUser.id || currentUser.isAdmin;
+    }
+
+    function adminLogin() {
+        const password = prompt('请输入管理员密码：');
+        if (password === ADMIN_PASSWORD) {
+            currentUser.isAdmin = true;
+            alert('✅ 管理员模式已启用');
+            if (currentProvince) {
+                refreshProvincePhotos(currentProvince);
+            }
+        } else if (password !== null) {
+            alert('❌ 密码错误');
+        }
+    }
+
+    // ---------- 初始化地图 ----------
+    const map = L.map('chinaMap', {
+        center: [35.0, 105.0],
+        zoom: 4,
+        minZoom: 3,
+        maxBounds: [[-10, 70], [55, 140]]
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // ---------- 全局数据 ----------
+    let allPhotos = [];
+    let provinceLayerMap = {};
+    let currentProvince = null;
+    let photoMarkers = L.layerGroup().addTo(map);
+    let timeFilter = { start: 1900, end: 2026 };
+    let geoJsonLayer = null;
+    let isMapLoaded = false;
+
+    const samplePhotos = [
+        { province: '北京市', location: '胡同里', year: '1984', dataURL: 'https://picsum.photos/id/101/200/150?grayscale' },
+        { province: '上海市', location: '外滩', year: '1996', dataURL: 'https://picsum.photos/id/104/200/150?grayscale' },
+        { province: '广东省', location: '深圳罗湖', year: '2008', dataURL: 'https://picsum.photos/id/106/200/150?grayscale' },
+        { province: '陕西省', location: '西安钟楼', year: '1978', dataURL: 'https://picsum.photos/id/107/200/150?grayscale' },
+        { province: '台湾省', location: '台北老街', year: '2015', dataURL: 'https://picsum.photos/id/108/200/150?grayscale' },
+    ];
+
+    // 多个备用数据源
+    // ✅ 替换为这个简化版本
+function loadGeoJSON() {
+    setLoadingState(true);
+    enableForm(false);
+
+    console.log('🗺️ 开始加载 100000_full.json...');
+
+    fetch('100000_full.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('✅ 加载成功，省份数:', data.features.length);
+            
+            geoJsonLayer = L.geoJSON(data, {
+                style: {
+                    color: '#1f4d7a',
+                    weight: 1.8,
+                    fillColor: '#aac7ec',
+                    fillOpacity: 0.4
+                },
+                onEachFeature: function (feature, layer) {
+                    const name = feature.properties.name;
+                    if (name) {
+                        provinceLayerMap[name] = layer;
+                        layer.on('click', function (e) {
+                            const bounds = layer.getBounds();
+                            map.flyToBounds(bounds, { maxZoom: 8, duration: 1.2 });
+                            currentProvince = name;
+                            document.getElementById('currentProvinceDisplay').innerText = `📌 ${name}`;
+                            refreshProvincePhotos(name);
+                            geoJsonLayer.resetStyle();
+                            layer.setStyle({ weight: 4, color: '#ff9933', fillOpacity: 0.7 });
+                        });
+                        layer.bindTooltip(name, { sticky: true, opacity: 0.8 });
+                    }
+                }
+            }).addTo(map);
+
+            const names = Object.keys(provinceLayerMap).sort();
+            provinceSelect.innerHTML = '<option value="" disabled selected>— 选择地点 —</option>';
+            names.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                provinceSelect.appendChild(option);
+            });
+
+            samplePhotos.forEach(sample => {
+                const layer = provinceLayerMap[sample.province];
+                if (layer) {
+                    const bounds = layer.getBounds();
+                    const [lat, lng] = randomLatLngFromBounds(bounds);
+                    allPhotos.push({
+                        id: 'sample_' + Date.now() + Math.random(),
+                        province: sample.province,
+                        location: sample.location,
+                        year: sample.year,
+                        dataURL: sample.dataURL,
+                        lat, lng,
+                        uploaderId: 'system'
+                    });
+                }
+            });
+
+            loadPhotosFromStorage();
+            updateStats();
+            isMapLoaded = true;
+            setLoadingState(false);
+            enableForm(true);
+        })
+        .catch(err => {
+            console.error('❌ 加载失败:', err);
+            setLoadingState(false, true);
+            alert('❌ 加载失败！请检查:\n1. 100000_full.json 是否存在\n2. 文件名是否完全匹配\n3. 是否通过 HTTP 访问');
+        });
+}
+
+    function randomLatLngFromBounds(bounds) {
+        const south = bounds.getSouth();
+        const north = bounds.getNorth();
+        const west = bounds.getWest();
+        const east = bounds.getEast();
+        const lat = south + Math.random() * (north - south);
+        const lng = west + Math.random() * (east - west);
+        return [lat, lng];
+    }
+
+    // ---------- 加载状态管理 ----------
+    const mapLoadingEl = document.getElementById('mapLoading');
+    const retryLoadBtn = document.getElementById('retryLoadBtn');
+    const provinceSelect = document.getElementById('provinceSelect');
+    const formInputs = [
+        document.getElementById('locationInput'),
+        document.getElementById('yearInput'),
+        document.getElementById('photoInput'),
+        document.getElementById('uploadBtn')
+    ];
+
+    function setLoadingState(loading, error = false) {
+        if (loading) {
+            mapLoadingEl.style.display = 'block';
+            mapLoadingEl.classList.remove('error');
+            mapLoadingEl.querySelector('.loading-text').innerText = '正在加载地图数据...';
+            retryLoadBtn.style.display = 'none';
+        } else {
+            if (error) {
+                mapLoadingEl.classList.add('error');
+                mapLoadingEl.querySelector('.loading-text').innerText = '地图数据加载失败';
+                retryLoadBtn.style.display = 'inline-block';
+            } else {
+                mapLoadingEl.style.display = 'none';
+            }
+        }
+    }
+
+    function enableForm(enabled) {
+        provinceSelect.disabled = !enabled;
+        formInputs.forEach(input => {
+            if (input) input.disabled = !enabled;
+        });
+        if (enabled && provinceSelect.options.length <= 1) {
+            provinceSelect.options[0].text = '— 选择地点 —';
+        }
+    }
+
+    // ---------- 评论功能 ----------
+    function loadComments() {
+        const stored = localStorage.getItem('photoComments');
+        return stored ? JSON.parse(stored) : {};
+    }
+
+    function saveComments(comments) {
+        localStorage.setItem('photoComments', JSON.stringify(comments));
+    }
+
+    function renderComments(photoId) {
+        const comments = loadComments();
+        const photoComments = comments[photoId] || [];
+        if (photoComments.length === 0) {
+            return '<div style="color:#8f9fb1;font-size:0.8rem;">暂无评论，快来留言吧</div>';
+        }
+        return photoComments.map(c => `
+            <div class="comment-item">
+                <span class="author">${c.author || '匿名用户'}</span>
+                <span class="time">${c.time}</span>
+                <div style="margin-top:4px;">${c.content}</div>
+            </div>
+        `).join('');
+    }
+
+    function addComment(photoId) {
+        const input = document.getElementById(`commentInput_${photoId}`);
+        const content = input.value.trim();
+        if (!content) {
+            alert('请输入评论内容');
+            return;
+        }
+        const comments = loadComments();
+        if (!comments[photoId]) {
+            comments[photoId] = [];
+        }
+        comments[photoId].push({
+            author: '访客',
+            content: content,
+            time: new Date().toLocaleString('zh-CN')
+        });
+        saveComments(comments);
+        input.value = '';
+        const commentList = document.getElementById(`commentList_${photoId}`);
+        if (commentList) {
+            commentList.innerHTML = renderComments(photoId);
+        }
+    }
+
+    // ---------- 删除照片功能 ----------
+    function deletePhoto(photoId) {
+        const photo = allPhotos.find(p => p.id === photoId);
+        if (!photo) {
+            alert('照片不存在');
+            return;
+        }
+        if (!canDeletePhoto(photo)) {
+            alert('❌ 您没有权限删除此照片');
+            return;
+        }
+        if (!confirm('确定要删除这张照片吗？此操作不可恢复。')) {
+            return;
+        }
+        const index = allPhotos.findIndex(p => p.id === photoId);
+        if (index !== -1) {
+            allPhotos.splice(index, 1);
+        }
+        const comments = loadComments();
+        if (comments[photoId]) {
+            delete comments[photoId];
+            saveComments(comments);
+        }
+        updateStats();
+        if (currentProvince) {
+            refreshProvincePhotos(currentProvince);
+        } else {
+            photoMarkers.clearLayers();
+            const filteredPhotos = allPhotos.filter(p => {
+                const year = parseInt(p.year);
+                return year >= timeFilter.start && year <= timeFilter.end;
+            });
+            filteredPhotos.forEach(p => addPhotoMarkerToMap(p));
+        }
+        savePhotosToStorage();
+        alert('✅ 照片已删除');
+    }
+
+    function savePhotosToStorage() {
+        try {
+            const photosToSave = allPhotos.filter(p => p.id.startsWith('user_'));
+            localStorage.setItem('uploadedPhotos', JSON.stringify(photosToSave));
+        } catch (e) {
+            console.warn('存储失败，数据可能过大');
+        }
+    }
+
+    function loadPhotosFromStorage() {
+        const stored = localStorage.getItem('uploadedPhotos');
+        if (stored) {
+            try {
+                const loaded = JSON.parse(stored);
+                loaded.forEach(p => {
+                    if (!allPhotos.find(existing => existing.id === p.id)) {
+                        allPhotos.push(p);
+                    }
+                });
+            } catch (e) {
+                console.error('加载存储数据失败');
+            }
+        }
+    }
+
+    // ---------- 添加照片标记到地图 ----------
+    function addPhotoMarkerToMap(p) {
+        const marker = L.marker([p.lat, p.lng], {
+            title: `${p.location} (${p.year})`,
+            riseOnHover: true
+        }).addTo(photoMarkers);
+
+        const canDelete = canDeletePhoto(p);
+        const popupContent = `
+            <div style="text-align:center;">
+                <img src="${p.dataURL}" class="custom-popup-img" onerror="this.src='https://via.placeholder.com/200x150?text=预览错误'"/>
+                <b>${p.location}</b><br>
+                <span style="color:#b4521a;">${p.year}年</span><br>
+                <small style="color:#3f5e7e;">${p.province}</small>
+                <div class="comment-section" id="commentSection_${p.id}">
+                    <div class="comment-list" id="commentList_${p.id}">
+                        ${renderComments(p.id)}
+                    </div>
+                    <div class="comment-input-row">
+                        <input type="text" id="commentInput_${p.id}" placeholder="写下你的回忆..." />
+                        <button onclick="addComment('${p.id}')">发布</button>
+                    </div>
+                </div>
+                ${canDelete ? `<button class="popup-delete-btn" onclick="deletePhoto('${p.id}')">🗑️ 删除此照片</button>` : ''}
+            </div>
+        `;
+        marker.bindPopup(popupContent, { maxWidth: 260 });
+    }
+
+    // ---------- 时间轴功能 ----------
+    function initTimeline() {
+        const startSlider = document.getElementById('timelineStart');
+        const endSlider = document.getElementById('timelineEnd');
+        const startLabel = document.getElementById('startYearLabel');
+        const endLabel = document.getElementById('endYearLabel');
+        const rangeDisplay = document.getElementById('timelineRange');
+
+        if (!startSlider || !endSlider) return;
+
+        startSlider.addEventListener('input', function() {
+            if (parseInt(this.value) > parseInt(endSlider.value) - 1) {
+                this.value = parseInt(endSlider.value) - 1;
+            }
+            startLabel.innerText = this.value;
+            timeFilter.start = parseInt(this.value);
+            updateTimelineRange();
+            applyTimeFilter();
+        });
+
+        endSlider.addEventListener('input', function() {
+            if (parseInt(this.value) < parseInt(startSlider.value) + 1) {
+                this.value = parseInt(startSlider.value) + 1;
+            }
+            endLabel.innerText = this.value;
+            timeFilter.end = parseInt(this.value);
+            updateTimelineRange();
+            applyTimeFilter();
+        });
+    }
+
+    function updateTimelineRange() {
+        const rangeDisplay = document.getElementById('timelineRange');
+        if (rangeDisplay) {
+            rangeDisplay.innerText = `${timeFilter.start} - ${timeFilter.end}`;
+        }
+    }
+
+    function applyTimeFilter() {
+        if (!isMapLoaded) return;
+        
+        if (currentProvince) {
+            refreshProvincePhotos(currentProvince);
+        } else {
+            photoMarkers.clearLayers();
+            const filteredPhotos = allPhotos.filter(p => {
+                const year = parseInt(p.year);
+                return year >= timeFilter.start && year <= timeFilter.end;
+            });
+            filteredPhotos.forEach(p => addPhotoMarkerToMap(p));
+        }
+        updateStats();
+    }
+
+    // ---------- 加载 GeoJSON ----------
+    let loadAttempt = 0;
+    const maxAttempts = geoJsonSources.length;
+
+    function loadGeoJSON() {
+        setLoadingState(true);
+        enableForm(false);
+
+        if (loadAttempt >= maxAttempts) {
+            setLoadingState(false, true);
+            alert('所有地图数据源均不可用，请检查网络连接后刷新页面。');
+            return;
+        }
+
+        const currentSource = geoJsonSources[loadAttempt];
+        console.log(`尝试加载数据源 ${loadAttempt + 1}/${maxAttempts}: ${currentSource}`);
+
+        fetch(currentSource, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // 成功加载
+            geoJsonLayer = L.geoJSON(data, {
+                style: {
+                    color: '#1f4d7a',
+                    weight: 1.8,
+                    fillColor: '#aac7ec',
+                    fillOpacity: 0.4,
+                    opacity: 0.9
+                },
+                onEachFeature: function (feature, layer) {
+                    const name = feature.properties.name;
+                    if (name) {
+                        provinceLayerMap[name] = layer;
+
+                        layer.on('click', function (e) {
+                            const bounds = layer.getBounds();
+                            map.flyToBounds(bounds, { maxZoom: 8, duration: 1.2 });
+                            currentProvince = name;
+                            document.getElementById('currentProvinceDisplay').innerText = `📌 ${name}`;
+                            refreshProvincePhotos(name);
+                            geoJsonLayer.resetStyle();
+                            layer.setStyle({ weight: 4, color: '#ff9933', fillOpacity: 0.7 });
+                        });
+
+                        layer.bindTooltip(name, { sticky: true, opacity: 0.8 });
+                    }
+                }
+            }).addTo(map);
+
+            // 填充省份选择器
+            const names = Object.keys(provinceLayerMap).sort();
+            provinceSelect.innerHTML = '<option value="" disabled selected>— 选择地点 —</option>';
+            names.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                provinceSelect.appendChild(option);
+            });
+
+            // 添加示例照片
+            samplePhotos.forEach(sample => {
+                const layer = provinceLayerMap[sample.province];
+                if (layer) {
+                    const bounds = layer.getBounds();
+                    const [lat, lng] = randomLatLngFromBounds(bounds);
+                    const newPhoto = {
+                        id: 'sample_' + Date.now() + Math.random(),
+                        province: sample.province,
+                        location: sample.location,
+                        year: sample.year,
+                        dataURL: sample.dataURL,
+                        lat, lng,
+                        uploaderId: 'system'
+                    };
+                    allPhotos.push(newPhoto);
+                }
+            });
+
+            loadPhotosFromStorage();
+            updateStats();
+            isMapLoaded = true;
+            setLoadingState(false);
+            enableForm(true);
+            console.log('✅ 地图数据加载成功');
+        })
+        .catch(err => {
+            console.warn(`数据源 ${loadAttempt + 1} 加载失败:`, err);
+            loadAttempt++;
+            // 1 秒后尝试下一个数据源
+            setTimeout(loadGeoJSON, 1000);
+        });
+    }
+
+    // 重试按钮
+    retryLoadBtn.addEventListener('click', function() {
+        loadAttempt = 0;
+        loadGeoJSON();
+    });
+
+    // ---------- 刷新照片显示 ----------
+    function refreshProvincePhotos(provinceName) {
+        photoMarkers.clearLayers();
+
+        const provincePhotos = allPhotos.filter(p => {
+            const year = parseInt(p.year);
+            return p.province === provinceName && 
+                   year >= timeFilter.start && 
+                   year <= timeFilter.end;
+        });
+
+        document.getElementById('photoCountInProvince').innerText = provincePhotos.length + ' 张';
+
+        const photoListDiv = document.getElementById('provincePhotoList');
+        if (provincePhotos.length === 0) {
+            photoListDiv.innerHTML = '<div class="empty-gallery">🕰️ 暂无照片，上传第一张吧</div>';
+        } else {
+            let htmlStr = '';
+            provincePhotos.forEach(p => {
+                const canDelete = canDeletePhoto(p);
+                htmlStr += `
+                    <div class="photo-item">
+                        ${canDelete ? `<div class="photo-actions"><button class="delete-btn" onclick="deletePhoto('${p.id}')" title="删除照片">🗑️</button></div>` : ''}
+                        <img class="photo-thumb" src="${p.dataURL}" alt="photo" onerror="this.src='https://via.placeholder.com/140x110?text=时代印记'">
+                        <div class="photo-info">
+                            <span class="loc">📍 ${p.location || '未知地点'}</span><br>
+                            <span class="year">📅 ${p.year || '年份不详'}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            photoListDiv.innerHTML = htmlStr;
+        }
+
+        provincePhotos.forEach(p => {
+            addPhotoMarkerToMap(p);
+        });
+    }
+
+    // ---------- 上传照片逻辑 ----------
+    document.getElementById('uploadBtn').addEventListener('click', function() {
+        const province = document.getElementById('provinceSelect').value;
+        const location = document.getElementById('locationInput').value.trim();
+        const year = document.getElementById('yearInput').value.trim();
+        const fileInput = document.getElementById('photoInput');
+        const file = fileInput.files[0];
+
+        if (!province) {
+            alert('请选择拍摄地点');
+            return;
+        }
+        if (!location) {
+            alert('请填写具体拍摄位置');
+            return;
+        }
+        if (!year) {
+            alert('请填写拍摄年份');
+            return;
+        }
+        if (!file) {
+            alert('请选择照片文件');
+            return;
+        }
+
+        const layer = provinceLayerMap[province];
+        if (!layer) {
+            alert('边界尚未加载完成，请稍后重试');
+            return;
+        }
+
+        const bounds = layer.getBounds();
+        const [lat, lng] = randomLatLngFromBounds(bounds);
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const dataURL = e.target.result;
+
+            const newPhoto = {
+                id: 'user_' + Date.now() + Math.random(),
+                province: province,
+                location: location,
+                year: year,
+                dataURL: dataURL,
+                lat: lat,
+                lng: lng,
+                uploaderId: currentUser.id,
+                uploadTime: new Date().toLocaleString('zh-CN')
+            };
+
+            allPhotos.push(newPhoto);
+            updateStats();
+
+            if (currentProvince === province) {
+                refreshProvincePhotos(province);
+            }
+
+            document.getElementById('locationInput').value = '';
+            document.getElementById('yearInput').value = '';
+            fileInput.value = '';
+
+            savePhotosToStorage();
+            alert('上传成功！点击该省地图即可看到您的照片。');
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // ---------- 更新统计 ----------
+    function updateStats() {
+        const filteredCount = allPhotos.filter(p => {
+            const year = parseInt(p.year);
+            return year >= timeFilter.start && year <= timeFilter.end;
+        }).length;
+        document.getElementById('photoCount').innerText = filteredCount;
+    }
+
+    // ---------- 重置视图 ----------
+    document.getElementById('resetViewBtn').addEventListener('click', function() {
+        map.flyTo([35.0, 105.0], 4, { duration: 1.2 });
+        photoMarkers.clearLayers();
+        currentProvince = null;
+        document.getElementById('currentProvinceDisplay').innerText = '🖼️ 点击地点查看照片';
+        document.getElementById('photoCountInProvince').innerText = '0 张';
+        document.getElementById('provincePhotoList').innerHTML = '<div class="empty-gallery">✨ 暂未上传照片，或点击地点查看</div>';
+        if (geoJsonLayer) geoJsonLayer.resetStyle();
+    });
+
+    // ---------- 管理员登录 ----------
+    document.getElementById('adminLoginBtn')?.addEventListener('click', adminLogin);
+
+    // ---------- 初始化 ----------
+    setTimeout(() => {
+        initTimeline();
+        updateStats();
+        loadGeoJSON();  // 开始加载地图数据
+    }, 500);
+})();
+</script>
+</body>
+</html>
